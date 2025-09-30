@@ -1,0 +1,188 @@
+/* Updated: 2025-09-30T10:32:09.222Z */
+/* Updated: 2025-09-30T10:31:13.768Z */
+/* Updated: 2025-09-30T10:29:32.010Z */
+/* Updated: 2025-09-30T09:37:36.424Z */
+/* Updated: 2025-09-30T09:33:17.946Z */
+/* Updated: 2025-09-30T09:32:11.246Z */
+/* Updated: 2025-09-30T09:29:38.334Z */
+/* Updated: 2025-09-30T08:54:33.181Z */
+/* Updated: 2025-09-30T08:41:12.982Z */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@100..900&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #2d2d2d;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #2d2d2d;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #2d2d2d;
+
+  --color-primary: #2d2d2d;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #f5f2f0;
+  --color-secondary-foreground: #2d2d2d;
+
+  --color-muted: #f5f2f0;
+  --color-muted-foreground: #666666;
+
+  --color-accent: #f4d2d2;
+  --color-accent-foreground: #2d2d2d;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #2d2d2d;
+
+  --color-chart-1: #e67e22;
+  --color-chart-2: #27ae60;
+  --color-chart-3: #e8e2dd;
+  --color-chart-4: #f4d2d2;
+  --color-chart-5: #000000;
+
+  --color-pink-accent: #f4d2d2;
+  --color-dark-gray: #2d2d2d;
+  --color-medium-gray: #666666;
+  --color-light-gray: #999999;
+  --color-orange-accent: #e67e22;
+  --color-green-accent: #27ae60;
+  --color-beige-neutral: #e8e2dd;
+  --color-black: #000000;
+
+  --font-display: "Cormorant Garamond", serif;
+  --font-body: "Inter", sans-serif;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e5e5;
+  }
+}
+
+@layer utilities {
+  body {
+    font-family: var(--font-body);
+  }
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #2d2d2d;
+    --card: #ffffff;
+    --card-foreground: #2d2d2d;
+    --popover: #ffffff;
+    --popover-foreground: #2d2d2d;
+    --primary: #2d2d2d;
+    --primary-foreground: #ffffff;
+    --secondary: #f5f2f0;
+    --secondary-foreground: #2d2d2d;
+    --muted: #f5f2f0;
+    --muted-foreground: #666666;
+    --accent: #f4d2d2;
+    --accent-foreground: #2d2d2d;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e5e5e5;
+    --input: #e5e5e5;
+    --ring: #2d2d2d;
+    --chart-1: #e67e22;
+    --chart-2: #27ae60;
+    --chart-3: #e8e2dd;
+    --chart-4: #f4d2d2;
+    --chart-5: #000000;
+    --radius: 0.5rem; /* Default radius, adjust as needed */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  h1 {
+    font-size: 4.5rem; /* 72px */
+    font-weight: 300;
+    line-height: 1.1;
+  }
+
+  h2 {
+    font-size: 3rem; /* 48px */
+    font-weight: 400;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-size: 1.5rem; /* 24px */
+    font-weight: 400;
+    line-height: 1.3;
+  }
+
+  p {
+    font-size: 1.125rem; /* 18px */
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  small {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .caption {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 400;
+    line-height: 1.3;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Hide Next.js error overlay portal */
+nextjs-portal {
+  display: none !important;
+}
