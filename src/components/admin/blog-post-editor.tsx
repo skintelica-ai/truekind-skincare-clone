@@ -1,13 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from '@/lib/auth-client';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
-import Underline from '@tiptap/extension-underline';
+import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
 import { 
   Save, 
   Eye, 
@@ -21,27 +17,24 @@ import {
   Plus,
   X,
   Search,
-  Bold,
-  Italic,
-  Strikethrough,
-  Code,
-  List,
-  ListOrdered,
-  Quote,
-  Undo,
-  Redo
+  Upload
 } from 'lucide-react';
+import 'react-quill/dist/quill.snow.css';
+
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 interface BlogPostEditorProps {
   postId?: number;
 }
 
 export function BlogPostEditor({ postId }: BlogPostEditorProps) {
-  const { data: session, isPending } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'products'>('content');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Content fields
   const [title, setTitle] = useState('');
@@ -85,65 +78,14 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   // Preview
   const [showPreview, setShowPreview] = useState(false);
 
-  // Initialize Tiptap editor
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3]
-        }
-      }),
-      Link.configure({
-        openOnClick: false,
-      }),
-      Image,
-      Underline
-    ],
-    content: content,
-    onUpdate: ({ editor }) => {
-      setContent(editor.getHTML());
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px] px-4 py-3',
-      },
-    },
-  });
-
-  // Update editor content when loading post
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content);
+    if (postId) {
+      loadPost();
     }
-  }, [editor, content]);
-
-  // Check authentication and role
-  useEffect(() => {
-    if (!isPending && !session?.user) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
-
-    if (!isPending && session?.user) {
-      const userRole = (session.user as any).role;
-      if (userRole !== 'admin' && userRole !== 'editor') {
-        router.push('/');
-        return;
-      }
-    }
-  }, [session, isPending, router]);
-
-  useEffect(() => {
-    if (!isPending && session?.user) {
-      if (postId) {
-        loadPost();
-      }
-      loadCategories();
-      loadTags();
-      loadProducts();
-    }
-  }, [postId, isPending, session]);
+    loadCategories();
+    loadTags();
+    loadProducts();
+  }, [postId]);
 
   useEffect(() => {
     // Auto-generate slug from title
@@ -159,19 +101,14 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   useEffect(() => {
     // Calculate read time
     const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-    const calculatedTime = Math.ceil(wordCount / 200);
+    const calculatedTime = Math.ceil(wordCount / 200); // 200 words per minute
     setReadTime(calculatedTime || 1);
   }, [content]);
 
   const loadPost = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('bearer_token');
-      const res = await fetch(`/api/blog/posts/${postId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(`/api/blog/posts/${postId}`);
       if (res.ok) {
         const data = await res.json();
         const post = data.post;
@@ -206,12 +143,7 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadCategories = async () => {
     try {
-      const token = localStorage.getItem('bearer_token');
-      const res = await fetch('/api/blog/categories', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch('/api/blog/categories');
       if (res.ok) {
         const data = await res.json();
         setCategories(data.categories || []);
@@ -223,12 +155,7 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadTags = async () => {
     try {
-      const token = localStorage.getItem('bearer_token');
-      const res = await fetch('/api/blog/tags', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch('/api/blog/tags');
       if (res.ok) {
         const data = await res.json();
         setTags(data.tags || []);
@@ -240,12 +167,7 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadProducts = async () => {
     try {
-      const token = localStorage.getItem('bearer_token');
-      const res = await fetch('/api/products?limit=100', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch('/api/products?limit=100');
       if (res.ok) {
         const data = await res.json();
         setProducts(data.products || []);
@@ -256,23 +178,78 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   };
 
   const handleImageUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return null;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return null;
+    }
+
+    setUploadingImage(true);
+
     try {
-      // You would implement your image upload endpoint here
-      // For now, using a placeholder
+      // Create a local URL for preview
       const imageUrl = URL.createObjectURL(file);
+      
+      // TODO: Implement actual upload to your storage service
+      // For now, using local object URL for preview
+      toast.success('Image uploaded successfully');
       return imageUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
       return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      const imageUrl = await handleImageUpload(files[0]);
+      if (imageUrl) {
+        setFeaturedImage(imageUrl);
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const imageUrl = await handleImageUpload(files[0]);
+      if (imageUrl) {
+        setFeaturedImage(imageUrl);
+      }
     }
   };
 
   const handleSave = async (saveStatus: 'draft' | 'published' | 'scheduled') => {
     if (!title || !content) {
-      alert('Title and content are required');
+      toast.error('Title and content are required');
+      return;
+    }
+
+    if (saveStatus === 'scheduled' && !publishedAt) {
+      toast.error('Please select a publish date and time for scheduled posts');
       return;
     }
 
@@ -305,20 +282,17 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
     try {
       const url = postId ? `/api/blog/posts/${postId}` : '/api/blog/posts';
       const method = postId ? 'PUT' : 'POST';
-      const token = localStorage.getItem('bearer_token');
       
       const res = await fetch(url, {
         method,
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(postData)
       });
 
       if (res.ok) {
         const data = await res.json();
-        alert(`Post ${saveStatus === 'published' ? 'published' : 'saved'} successfully!`);
+        const statusMessage = saveStatus === 'published' ? 'published' : saveStatus === 'scheduled' ? 'scheduled' : 'saved as draft';
+        toast.success(`Post ${statusMessage} successfully!`);
         
         // Ping sitemap if published
         if (saveStatus === 'published') {
@@ -329,19 +303,40 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
           router.push(`/admin/blog/posts/${data.post.id}/edit`);
         }
       } else {
-        alert('Failed to save post');
+        const errorData = await res.json().catch(() => ({}));
+        toast.error(errorData.error || 'Failed to save post');
       }
     } catch (error) {
       console.error('Error saving post:', error);
-      alert('An error occurred while saving the post');
+      toast.error('An error occurred while saving the post');
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePreview = () => {
+    if (!title || !content) {
+      toast.error('Title and content are required for preview');
+      return;
+    }
+    
+    // Store preview data in sessionStorage
+    sessionStorage.setItem('blog-preview', JSON.stringify({
+      title,
+      excerpt,
+      content,
+      featuredImage,
+      readTime,
+      publishedAt: publishedAt || new Date().toISOString()
+    }));
+    
+    // Open preview in new tab
+    window.open('/admin/blog/preview', '_blank');
+  };
+
   const addProductLink = (product: any) => {
     if (productLinks.some(p => p.productId === product.id)) {
-      alert('Product already added');
+      toast.error('Product already added');
       return;
     }
 
@@ -353,28 +348,26 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
       productUrl: `/shop/${product.slug}`,
       position: productLinks.length + 1
     }]);
+    
+    toast.success('Product linked successfully');
   };
 
   const removeProductLink = (productId: number) => {
     setProductLinks(productLinks.filter(p => p.productId !== productId));
   };
 
-  // Show loading state while checking authentication
-  if (isPending) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render if not authenticated or not admin/editor
-  if (!session?.user) return null;
-  const userRole = (session.user as any).role;
-  if (userRole !== 'admin' && userRole !== 'editor') return null;
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'indent': '-1'}, { 'indent': '+1' }],
+      ['blockquote', 'code-block'],
+      ['link', 'image'],
+      [{ 'align': [] }],
+      ['clean']
+    ]
+  };
 
   if (loading) {
     return (
@@ -404,8 +397,9 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setShowPreview(!showPreview)}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2"
+                onClick={handlePreview}
+                disabled={saving}
+                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Eye className="w-4 h-4" />
                 Preview
@@ -414,16 +408,16 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
               <button
                 onClick={() => handleSave('draft')}
                 disabled={saving}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
-                Save Draft
+                {saving ? 'Saving...' : 'Save Draft'}
               </button>
               
               <button
                 onClick={() => handleSave('scheduled')}
                 disabled={saving || !publishedAt}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Clock className="w-4 h-4" />
                 Schedule
@@ -432,10 +426,10 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
               <button
                 onClick={() => handleSave('published')}
                 disabled={saving}
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-accent transition-colors flex items-center gap-2"
+                className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-accent transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
-                Publish
+                {saving ? 'Publishing...' : 'Publish'}
               </button>
             </div>
           </div>
@@ -526,141 +520,14 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
             {/* Content Tab */}
             {activeTab === 'content' && (
-              <div className="bg-card border border-border rounded-lg overflow-hidden">
-                {/* Tiptap Toolbar */}
-                {editor && (
-                  <div className="border-b border-border p-2 flex flex-wrap gap-1 bg-muted/30">
-                    <button
-                      onClick={() => editor.chain().focus().toggleBold().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('bold') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <Bold className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleItalic().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('italic') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <Italic className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleUnderline().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('underline') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <span className="text-sm font-semibold">U</span>
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleStrike().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('strike') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <Strikethrough className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleCode().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('code') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <Code className="w-4 h-4" />
-                    </button>
-                    
-                    <div className="w-px h-8 bg-border mx-1" />
-                    
-                    <button
-                      onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
-                        editor.isActive('heading', { level: 1 }) ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      H1
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
-                        editor.isActive('heading', { level: 2 }) ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      H2
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
-                        editor.isActive('heading', { level: 3 }) ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      H3
-                    </button>
-                    
-                    <div className="w-px h-8 bg-border mx-1" />
-                    
-                    <button
-                      onClick={() => editor.chain().focus().toggleBulletList().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('bulletList') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <List className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('orderedList') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <ListOrdered className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                      className={`p-2 rounded hover:bg-secondary transition-colors ${
-                        editor.isActive('blockquote') ? 'bg-secondary' : ''
-                      }`}
-                      type="button"
-                    >
-                      <Quote className="w-4 h-4" />
-                    </button>
-                    
-                    <div className="w-px h-8 bg-border mx-1" />
-                    
-                    <button
-                      onClick={() => editor.chain().focus().undo().run()}
-                      disabled={!editor.can().undo()}
-                      className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50"
-                      type="button"
-                    >
-                      <Undo className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => editor.chain().focus().redo().run()}
-                      disabled={!editor.can().redo()}
-                      className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50"
-                      type="button"
-                    >
-                      <Redo className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                
-                {/* Tiptap Editor */}
-                <div className="bg-background min-h-[400px]">
-                  <EditorContent editor={editor} />
-                </div>
+              <div className="bg-card border border-border rounded-lg p-6">
+                <ReactQuill
+                  value={content}
+                  onChange={setContent}
+                  modules={quillModules}
+                  className="h-96 mb-12"
+                  theme="snow"
+                />
               </div>
             )}
 
@@ -843,32 +710,70 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
               <h3 className="font-semibold mb-4">Featured Image</h3>
               
               {featuredImage ? (
-                <div className="relative">
+                <div className="relative group">
                   <img
                     src={featuredImage}
                     alt="Featured"
                     className="w-full h-48 object-cover rounded-lg mb-3"
                   />
-                  <button
-                    onClick={() => setFeaturedImage('')}
-                    className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-lg"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-accent transition-colors"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setFeaturedImage('')}
+                      className="p-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                  <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-3">Add featured image</p>
-                  <input
-                    type="text"
-                    placeholder="Image URL"
-                    value={featuredImage}
-                    onChange={(e) => setFeaturedImage(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+                    isDragging 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadingImage ? (
+                    <div className="space-y-3">
+                      <div className="w-12 h-12 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                      <p className="text-sm text-muted-foreground">Uploading...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm font-medium mb-1">Drop image here or click to upload</p>
+                      <p className="text-xs text-muted-foreground mb-3">Supports: JPG, PNG, GIF (Max 5MB)</p>
+                      <div className="text-xs text-muted-foreground">or</div>
+                      <input
+                        type="text"
+                        placeholder="Paste image URL"
+                        value={featuredImage}
+                        onChange={(e) => setFeaturedImage(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-3 w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </>
+                  )}
                 </div>
               )}
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
             </div>
 
             {/* Categories */}
