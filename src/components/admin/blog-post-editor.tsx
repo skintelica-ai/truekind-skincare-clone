@@ -45,7 +45,15 @@ const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'seo' | 'products'>('content');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const contentImageInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Image/Link insertion dialogs
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
   
   // Content fields
   const [title, setTitle] = useState('');
@@ -106,7 +114,7 @@ const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
       }),
       Image.configure({
         HTMLAttributes: {
-          class: 'rounded-lg max-w-full h-auto',
+          class: 'rounded-lg max-w-full h-auto my-4',
         },
       }),
       Placeholder.configure({
@@ -260,6 +268,70 @@ const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  // NEW: Insert image into content
+  const handleInsertImage = async () => {
+    if (!editor) return;
+
+    if (imageUrl) {
+      editor.chain().focus().setImage({ src: imageUrl }).run();
+      setImageUrl('');
+      setShowImageDialog(false);
+      toast.success('Image inserted');
+    } else {
+      toast.error('Please enter an image URL');
+    }
+  };
+
+  // NEW: Insert image from file upload
+  const handleContentImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !editor) return;
+
+    const imageUrl = await handleImageUpload(files[0]);
+    if (imageUrl) {
+      editor.chain().focus().setImage({ src: imageUrl }).run();
+      toast.success('Image inserted into content');
+    }
+  };
+
+  // NEW: Insert/update link
+  const handleInsertLink = () => {
+    if (!editor) return;
+
+    if (!linkUrl) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
+    // If text is selected, wrap it with link
+    if (editor.state.selection.empty) {
+      // No selection, insert link with text
+      if (!linkText) {
+        toast.error('Please enter link text');
+        return;
+      }
+      editor
+        .chain()
+        .focus()
+        .insertContent(`<a href="${linkUrl}">${linkText}</a>`)
+        .run();
+    } else {
+      // Has selection, just add link
+      editor.chain().focus().setLink({ href: linkUrl }).run();
+    }
+
+    setLinkUrl('');
+    setLinkText('');
+    setShowLinkDialog(false);
+    toast.success('Link inserted');
+  };
+
+  // NEW: Remove link
+  const handleRemoveLink = () => {
+    if (!editor) return;
+    editor.chain().focus().unsetLink().run();
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
@@ -639,6 +711,39 @@ const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
                   </button>
                   <div className="w-px bg-border mx-1" />
                   <button
+                    onClick={() => setShowImageDialog(true)}
+                    className="p-2 rounded hover:bg-secondary transition-colors"
+                    title="Insert Image"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const { from, to } = editor?.state.selection || {};
+                      if (from !== to) {
+                        const selectedText = editor?.state.doc.textBetween(from!, to!, ' ');
+                        setLinkText(selectedText || '');
+                      }
+                      setShowLinkDialog(true);
+                    }}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('link') ? 'bg-secondary' : ''
+                    }`}
+                    title="Insert Link"
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                  </button>
+                  {editor?.isActive('link') && (
+                    <button
+                      onClick={handleRemoveLink}
+                      className="p-2 rounded hover:bg-destructive/10 transition-colors text-destructive"
+                      title="Remove Link"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                  <div className="w-px bg-border mx-1" />
+                  <button
                     onClick={() => editor?.chain().focus().undo().run()}
                     disabled={!editor?.can().undo()}
                     className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1004,6 +1109,120 @@ const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
           </div>
         </div>
       </div>
+
+      {/* NEW: Image Dialog */}
+      {showImageDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-semibold text-lg mb-4">Insert Image</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Image URL</label>
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground mb-3">or</p>
+                <button
+                  onClick={() => contentImageInputRef.current?.click()}
+                  className="px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 mx-auto"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Image
+                </button>
+                <input
+                  ref={contentImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleContentImageUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setImageUrl('');
+                    setShowImageDialog(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInsertImage}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-accent transition-colors"
+                >
+                  Insert
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Link Dialog */}
+      {showLinkDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
+            <h3 className="font-semibold text-lg mb-4">Insert Link</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">URL</label>
+                <input
+                  type="text"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+
+              {editor?.state.selection.empty && (
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Link Text</label>
+                  <input
+                    type="text"
+                    value={linkText}
+                    onChange={(e) => setLinkText(e.target.value)}
+                    placeholder="Click here"
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setLinkUrl('');
+                    setLinkText('');
+                    setShowLinkDialog(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInsertLink}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-accent transition-colors"
+                >
+                  Insert
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
