@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ShoppingBag, MapPin, Heart, User, Search } from "lucide-react";
+import { ShoppingBag, MapPin, Heart, User, Search, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { authClient, useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { gsap } from "gsap";
 
 const TrueKindLogo = () => (
   <Link href="/" aria-label="Truekind homepage">
@@ -147,8 +151,17 @@ export default function NavigationBar() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const { data: session, isPending, refetch } = useSession();
+  const router = useRouter();
 
   useEffect(() => {
+    // Animate navigation on mount
+    gsap.fromTo(
+      ".nav-main",
+      { y: -20, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }
+    );
+    
     updateCounts();
     
     const handleCartUpdate = () => updateCounts();
@@ -183,41 +196,78 @@ export default function NavigationBar() {
     }
   };
 
+  const handleSignOut = async () => {
+    const { error } = await authClient.signOut();
+    if (error?.code) {
+      toast.error(error.code);
+    } else {
+      localStorage.removeItem("bearer_token");
+      refetch();
+      toast.success("Signed out successfully");
+      router.push("/");
+    }
+  };
+
   const categories = ["MAKEUP", "SKINCARE", "HAIR", "TOOLS & BRUSHES", "BATH & BODY", "FRAGRANCE", "CLEAN", "GIFTS", "SALE"];
 
   return (
     <>
       {/* Top utility bar */}
-      <div className="w-full bg-black text-white">
+      <div className="w-full bg-gradient-to-r from-[#FF7034] to-[#FF9467] text-white">
         <div className="container flex h-9 items-center justify-between text-xs">
           <div className="flex items-center gap-4">
-            <Link href="/orders" className="flex items-center gap-1.5 hover:text-gray-300 transition-colors">
+            <Link href="/orders" className="flex items-center gap-1.5 hover:text-white/80 transition-all duration-300 hover:scale-105">
               <User className="h-3.5 w-3.5" />
               <span>My Orders</span>
             </Link>
-            <Link href="/shop" className="hover:text-gray-300 transition-colors">
+            <Link href="/shop" className="hover:text-white/80 transition-all duration-300 hover:scale-105">
               Shop All
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/shop" className="flex items-center gap-1.5 hover:text-gray-300 transition-colors">
+            {!isPending && (
+              session?.user ? (
+                <>
+                  <span className="text-[10px] opacity-90">
+                    Hi, {session.user.name?.split(" ")[0]}
+                  </span>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-1.5 hover:text-white/80 transition-all duration-300 hover:scale-105"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="hover:text-white/80 transition-all duration-300 hover:scale-105">
+                    Sign In
+                  </Link>
+                  <Link href="/register" className="hover:text-white/80 transition-all duration-300 hover:scale-105">
+                    Register
+                  </Link>
+                </>
+              )
+            )}
+            <Link href="/shop" className="flex items-center gap-1.5 hover:text-white/80 transition-all duration-300 hover:scale-105">
               <MapPin className="h-3.5 w-3.5" />
               <span>Shop</span>
             </Link>
-            <Link href="/wishlist" className="flex items-center gap-1.5 hover:text-gray-300 transition-colors relative">
+            <Link href="/wishlist" className="flex items-center gap-1.5 hover:text-white/80 transition-all duration-300 hover:scale-105 relative">
               <Heart className="h-3.5 w-3.5" />
               <span>Wishlist</span>
               {wishlistCount > 0 && (
-                <Badge className="ml-1 h-4 min-w-[16px] rounded-full bg-orange-accent px-1 text-[10px] leading-none">
+                <Badge className="ml-1 h-4 min-w-[16px] rounded-full bg-white text-orange-accent px-1 text-[10px] leading-none animate-pulse">
                   {wishlistCount}
                 </Badge>
               )}
             </Link>
-            <Link href="/cart" className="flex items-center gap-1.5 hover:text-gray-300 transition-colors relative">
+            <Link href="/cart" className="flex items-center gap-1.5 hover:text-white/80 transition-all duration-300 hover:scale-105 relative">
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Cart</span>
               {cartCount > 0 && (
-                <Badge className="ml-1 h-4 min-w-[16px] rounded-full bg-orange-accent px-1 text-[10px] leading-none">
+                <Badge className="ml-1 h-4 min-w-[16px] rounded-full bg-white text-orange-accent px-1 text-[10px] leading-none animate-pulse">
                   {cartCount}
                 </Badge>
               )}
@@ -227,26 +277,26 @@ export default function NavigationBar() {
       </div>
 
       {/* Main header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background">
+      <header className="nav-main sticky top-0 z-50 w-full border-b border-border/70 bg-background/95 backdrop-blur-sm shadow-sm">
         <div className="container">
           <div className="flex h-[88px] items-center justify-between gap-8">
             <TrueKindLogo />
 
             {/* Search bar */}
             <div className="flex-1 max-w-xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-hover:text-orange-accent transition-colors duration-300" />
                 <input
                   type="search"
                   placeholder="Search for brands and products"
-                  className="w-full h-10 pl-10 pr-4 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full h-10 pl-10 pr-4 text-sm border border-muted rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300 hover:border-primary"
                 />
               </div>
             </div>
 
             {/* Right section */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium">
+              <span className="text-xs font-medium bg-gradient-to-r from-[#FF7034] to-[#FF9467] bg-clip-text text-transparent">
                 FREE SHIPPING<br />ABOVE ₹ 999
               </span>
             </div>
@@ -260,13 +310,14 @@ export default function NavigationBar() {
                   key={category}
                   href="/shop"
                   onMouseEnter={() => setActiveMenu(category)}
-                  className={`px-4 py-4 text-[13px] font-semibold tracking-wide transition-colors ${
+                  className={`px-4 py-4 text-[13px] font-semibold tracking-wide transition-all duration-300 hover:scale-105 relative group ${
                     activeMenu === category 
-                      ? "text-[#d00000]" 
-                      : "text-primary hover:text-[#d00000]"
+                      ? "text-primary" 
+                      : "text-primary/70 hover:text-primary"
                   }`}
                 >
                   {category}
+                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-[#FF7034] to-[#FF9467] group-hover:w-3/4 transition-all duration-300"></span>
                 </Link>
               ))}
             </div>
@@ -277,18 +328,18 @@ export default function NavigationBar() {
       {/* Mega menu dropdown */}
       {activeMenu && megaMenuData[activeMenu]?.length > 0 && (
         <div
-          className="fixed left-0 right-0 top-[165px] z-40 bg-white border-b border-gray-200 shadow-lg"
+          className="fixed left-0 right-0 top-[165px] z-40 bg-white/95 backdrop-blur-md border-b border-muted shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300"
           onMouseEnter={() => setActiveMenu(activeMenu)}
           onMouseLeave={() => setActiveMenu(null)}
         >
           <div className="container py-8">
             <div className="grid grid-cols-5 gap-8">
               {megaMenuData[activeMenu].map((section, index) => (
-                <div key={index}>
+                <div key={index} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
                   {section.title && (
-                    <h3 className="font-semibold text-sm mb-3 text-[#d00000] flex items-center gap-1">
+                    <h3 className="font-semibold text-sm mb-3 text-primary flex items-center gap-1 group cursor-pointer">
                       {section.title}
-                      <span className="text-[#d00000]">›</span>
+                      <span className="text-primary transition-transform duration-300 group-hover:translate-x-1">›</span>
                     </h3>
                   )}
                   <ul className="space-y-2">
@@ -296,7 +347,7 @@ export default function NavigationBar() {
                       <li key={itemIndex}>
                         <Link
                           href="/shop"
-                          className="text-sm text-gray-700 hover:text-primary transition-colors block"
+                          className="text-sm text-gray-700 hover:text-primary transition-all duration-300 block hover:translate-x-1 hover:font-medium"
                         >
                           {item}
                         </Link>
@@ -313,7 +364,7 @@ export default function NavigationBar() {
       {/* Overlay for mega menu */}
       {activeMenu && (
         <div
-          className="fixed inset-0 bg-black/20 z-30 top-[165px]"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 top-[165px] animate-in fade-in duration-200"
           onMouseEnter={() => setActiveMenu(null)}
         />
       )}
