@@ -6,6 +6,8 @@ import { headers } from "next/headers"
 import { db } from "@/db";
  
 export const auth = betterAuth({
+	baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+	trustedOrigins: ["http://localhost:3000"],
 	database: drizzleAdapter(db, {
 		provider: "sqlite",
 	}),
