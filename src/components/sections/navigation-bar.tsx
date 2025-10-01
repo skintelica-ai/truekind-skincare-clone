@@ -311,7 +311,7 @@ export default function NavigationBar() {
               {categories.map((category) => (
                 <Link
                   key={category}
-                  href="/shop"
+                  href={category === "JOURNAL" ? "/blog" : "/shop"}
                   onMouseEnter={() => setActiveMenu(category)}
                   className={`px-4 py-4 text-[13px] font-semibold tracking-wide transition-all duration-300 hover:scale-105 relative group ${
                     activeMenu === category 
