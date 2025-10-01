@@ -1,9 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { useSession } from '@/lib/auth-client';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import Underline from '@tiptap/extension-underline';
 import { 
   Save, 
   Eye, 
@@ -16,11 +20,17 @@ import {
   ArrowLeft,
   Plus,
   X,
-  Search
+  Search,
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  List,
+  ListOrdered,
+  Quote,
+  Undo,
+  Redo
 } from 'lucide-react';
-import 'react-quill/dist/quill.snow.css';
-
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 interface BlogPostEditorProps {
   postId?: number;
@@ -75,6 +85,38 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   // Preview
   const [showPreview, setShowPreview] = useState(false);
 
+  // Initialize Tiptap editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3]
+        }
+      }),
+      Link.configure({
+        openOnClick: false,
+      }),
+      Image,
+      Underline
+    ],
+    content: content,
+    onUpdate: ({ editor }) => {
+      setContent(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[400px] px-4 py-3',
+      },
+    },
+  });
+
+  // Update editor content when loading post
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [editor, content]);
+
   // Check authentication and role
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -116,7 +158,7 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   useEffect(() => {
     // Calculate read time
     const wordCount = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
-    const calculatedTime = Math.ceil(wordCount / 200); // 200 words per minute
+    const calculatedTime = Math.ceil(wordCount / 200);
     setReadTime(calculatedTime || 1);
   }, [content]);
 
@@ -316,19 +358,6 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
     setProductLinks(productLinks.filter(p => p.productId !== productId));
   };
 
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
-      ['blockquote', 'code-block'],
-      ['link', 'image'],
-      [{ 'align': [] }],
-      ['clean']
-    ]
-  };
-
   // Show loading state while checking authentication
   if (isPending) {
     return (
@@ -496,14 +525,141 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
             {/* Content Tab */}
             {activeTab === 'content' && (
-              <div className="bg-card border border-border rounded-lg p-6">
-                <ReactQuill
-                  value={content}
-                  onChange={setContent}
-                  modules={quillModules}
-                  className="h-96 mb-12"
-                  theme="snow"
-                />
+              <div className="bg-card border border-border rounded-lg overflow-hidden">
+                {/* Tiptap Toolbar */}
+                {editor && (
+                  <div className="border-b border-border p-2 flex flex-wrap gap-1 bg-muted/30">
+                    <button
+                      onClick={() => editor.chain().focus().toggleBold().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('bold') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <Bold className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleItalic().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('italic') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <Italic className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleUnderline().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('underline') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <span className="text-sm font-semibold">U</span>
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleStrike().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('strike') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <Strikethrough className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleCode().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('code') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <Code className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="w-px h-8 bg-border mx-1" />
+                    
+                    <button
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
+                        editor.isActive('heading', { level: 1 }) ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      H1
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
+                        editor.isActive('heading', { level: 2 }) ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      H2
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                      className={`px-3 py-2 rounded hover:bg-secondary transition-colors text-sm font-semibold ${
+                        editor.isActive('heading', { level: 3 }) ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      H3
+                    </button>
+                    
+                    <div className="w-px h-8 bg-border mx-1" />
+                    
+                    <button
+                      onClick={() => editor.chain().focus().toggleBulletList().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('bulletList') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('orderedList') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <ListOrdered className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                      className={`p-2 rounded hover:bg-secondary transition-colors ${
+                        editor.isActive('blockquote') ? 'bg-secondary' : ''
+                      }`}
+                      type="button"
+                    >
+                      <Quote className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="w-px h-8 bg-border mx-1" />
+                    
+                    <button
+                      onClick={() => editor.chain().focus().undo().run()}
+                      disabled={!editor.can().undo()}
+                      className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50"
+                      type="button"
+                    >
+                      <Undo className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().redo().run()}
+                      disabled={!editor.can().redo()}
+                      className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50"
+                      type="button"
+                    >
+                      <Redo className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                
+                {/* Tiptap Editor */}
+                <div className="bg-background min-h-[400px]">
+                  <EditorContent editor={editor} />
+                </div>
               </div>
             )}
 
