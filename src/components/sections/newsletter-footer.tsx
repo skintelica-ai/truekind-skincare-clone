@@ -1,8 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const TrueKindFooterLogo = () => (
   <svg
@@ -42,6 +46,28 @@ const ArrowIcon = ({ className }: { className?: string }) => (
 
 
 const NewsletterFooter = () => {
+  const newsletterRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!newsletterRef.current || !formRef.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.from(formRef.current, {
+        opacity: 0,
+        y: 50,
+        duration: 1,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: newsletterRef.current,
+          start: "top 80%",
+        },
+      });
+    }, newsletterRef);
+
+    return () => ctx.revert();
+  }, []);
+
   const imageUrl = "https://slelguoygbfzlpylpxfs.supabase.co/storage/v1/object/public/test-clones/3b0516f1-9fa9-4c4a-b3a3-3ad67e6bf33b-truekindskincare-com/assets/images/footer-30.jpg?";
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,7 +77,7 @@ const NewsletterFooter = () => {
 
   return (
     <footer className="bg-background text-foreground">
-      <div className="relative h-[700px] md:h-[800px] lg:h-[860px]">
+      <div ref={newsletterRef} className="relative h-[700px] md:h-[800px] lg:h-[860px]">
         <Image
           src={imageUrl}
           alt="Skincare products on a purple background"
@@ -60,68 +86,68 @@ const NewsletterFooter = () => {
           sizes="100vw"
           quality={95}
         />
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/40 to-accent/30" />
         <div className="relative container mx-auto h-full px-4 sm:px-6 lg:px-8 flex
          justify-center md:justify-end items-center">
-          <div className="w-full max-w-sm md:max-w-md lg:max-w-lg bg-primary text-primary-foreground p-10 md:p-14 lg:p-20">
+          <div ref={formRef} className="w-full max-w-sm md:max-w-md lg:max-w-lg bg-primary text-primary-foreground p-10 md:p-14 lg:p-20 rounded-2xl shadow-2xl backdrop-blur-sm">
             <h2 className="font-serif text-[44px] md:text-5xl font-light leading-none mb-4">
               HEAR MORE <br /> FROM US
             </h2>
-            <p className="font-sans text-base text-gray-300 mb-10">
+            <p className="font-sans text-base text-white/90 mb-10">
               Get the latest news about skincare tips and new products.
             </p>
             <form onSubmit={handleSubmit} className="mb-10">
-              <div className="relative border-b border-gray-500 mb-4 group">
+              <div className="relative border-b-2 border-white/60 mb-4 group">
                 <input
                   type="email"
                   placeholder="ENTER YOUR EMAIL"
-                  className="w-full bg-transparent border-0 py-3 text-white placeholder-gray-400 focus:ring-0 text-sm uppercase tracking-widest"
+                  className="w-full bg-transparent border-0 py-3 text-white placeholder-white/70 focus:ring-0 text-sm uppercase tracking-widest"
                 />
                 <button
                   type="submit"
                   aria-label="Subscribe"
-                  className="absolute right-[-15px] bottom-[-20px] h-16 w-16 rounded-full border border-white flex items-center justify-center text-white bg-primary hover:bg-white hover:text-primary transition-colors duration-300"
+                  className="absolute right-[-15px] bottom-[-20px] h-16 w-16 rounded-full border-2 border-white flex items-center justify-center text-white bg-primary hover:bg-white hover:text-primary transition-all duration-300 hover:scale-110 shadow-lg"
                 >
                   <ArrowIcon className="w-4 h-4" />
                 </button>
               </div>
-              <button type="submit" className="text-xs font-semibold tracking-widest cursor-pointer mt-10 text-left">SUBSCRIBE</button>
+              <button type="submit" className="text-xs font-semibold tracking-widest cursor-pointer mt-10 text-left hover:underline transition-all">SUBSCRIBE</button>
             </form>
-            <hr className="border-gray-600 mb-6" />
-            <p className="font-sans text-xs text-gray-400 leading-relaxed">
+            <hr className="border-white/40 mb-6" />
+            <p className="font-sans text-xs text-white/80 leading-relaxed">
               No spam, only quality articles to help you be more radiant. You can opt out anytime.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="py-16 md:py-24 border-b border-border">
+      <div className="py-16 md:py-24 border-b border-border bg-secondary/30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 md:gap-8">
             <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Explore</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Explore</p>
               <ul className="space-y-3 font-sans text-sm">
-                <li><Link href="/products" className="hover:text-gray-500 transition-colors">Shop</Link></li>
-                <li><Link href="/philosophy" className="hover:text-gray-500 transition-colors">Philosophy</Link></li>
-                <li><Link href="/gallery" className="hover:text-gray-500 transition-colors">Gallery</Link></li>
-                <li><Link href="/journal" className="hover:text-gray-500 transition-colors">Journal</Link></li>
-                <li><Link href="/login" className="hover:text-gray-500 transition-colors">Sign Up/Login</Link></li>
+                <li><Link href="/products" className="hover:text-primary transition-colors">Shop</Link></li>
+                <li><Link href="/philosophy" className="hover:text-primary transition-colors">Philosophy</Link></li>
+                <li><Link href="/gallery" className="hover:text-primary transition-colors">Gallery</Link></li>
+                <li><Link href="/journal" className="hover:text-primary transition-colors">Journal</Link></li>
+                <li><Link href="/login" className="hover:text-primary transition-colors">Sign Up/Login</Link></li>
               </ul>
             </div>
             
             <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Follow Us</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Follow Us</p>
               <ul className="space-y-3 font-sans text-sm">
-                <li><a href="https://www.instagram.com/truekind.skin/" target="_blank" rel="noopener noreferrer" className="hover:text-gray-500 transition-colors">Instagram</a></li>
-                <li><a href="#" className="hover:text-gray-500 transition-colors">Facebook</a></li>
+                <li><a href="https://www.instagram.com/truekind.skin/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Instagram</a></li>
+                <li><a href="#" className="hover:text-primary transition-colors">Facebook</a></li>
               </ul>
             </div>
             
             <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contact Us</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Contact Us</p>
               <ul className="space-y-3 font-sans text-sm">
-                <li><a href="mailto:tk@anandsofia.com" className="hover:text-gray-500 transition-colors">tk@anandsofia.com</a></li>
-                <li><a href="tel:1111-2222-3333" className="hover:text-gray-500 transition-colors">1111-2222-3333</a></li>
+                <li><a href="mailto:tk@anandsofia.com" className="hover:text-primary transition-colors">tk@anandsofia.com</a></li>
+                <li><a href="tel:1111-2222-3333" className="hover:text-primary transition-colors">1111-2222-3333</a></li>
               </ul>
             </div>
           </div>
@@ -144,10 +170,10 @@ const NewsletterFooter = () => {
             </div>
             <div className="text-sm">
               <ul className="flex flex-col md:flex-row md:items-center gap-x-6 gap-y-2 text-muted-foreground">
-                <li><Link href="#" className="hover:text-foreground transition-colors">Disclaimer</Link></li>
-                <li><Link href="#" className="hover:text-foreground transition-colors">Credits</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Disclaimer</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Credits</Link></li>
                 <li className="text-xs text-gray-400">
-                  Website by: <a href="#" className="underline hover:text-foreground transition-colors">abhishek</a> &amp; <a href="#" className="underline hover:text-foreground transition-colors">reksa</a>
+                  Website by: <a href="#" className="underline hover:text-primary transition-colors">abhishek</a> &amp; <a href="#" className="underline hover:text-primary transition-colors">reksa</a>
                 </li>
               </ul>
             </div>
