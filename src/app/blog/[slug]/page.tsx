@@ -349,7 +349,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <BlogPostContent 
             content={post.content} 
             productLinks={post.productLinks}
-            postId={post.id}
+            postSlug={post.slug}
           />
 
           {/* Tags */}

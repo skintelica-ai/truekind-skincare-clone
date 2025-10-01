@@ -15,15 +15,15 @@ interface ProductLink {
 interface BlogPostContentProps {
   content: string;
   productLinks: ProductLink[];
-  postId: number;
+  postSlug: string;
 }
 
-export function BlogPostContent({ content, productLinks, postId }: BlogPostContentProps) {
+export function BlogPostContent({ content, productLinks, postSlug }: BlogPostContentProps) {
   useEffect(() => {
     // Track pageview
     const trackPageview = async () => {
       try {
-        await fetch(`/api/blog/posts/${postId}/analytics`, {
+        await fetch(`/api/blog/posts/${postSlug}/analytics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -48,7 +48,7 @@ export function BlogPostContent({ content, productLinks, postId }: BlogPostConte
       if (scrollPercentage > maxScrollDepth && scrollPercentage % 25 === 0) {
         maxScrollDepth = scrollPercentage;
         
-        fetch(`/api/blog/posts/${postId}/analytics`, {
+        fetch(`/api/blog/posts/${postSlug}/analytics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -61,7 +61,7 @@ export function BlogPostContent({ content, productLinks, postId }: BlogPostConte
 
     window.addEventListener('scroll', trackScroll);
     return () => window.removeEventListener('scroll', trackScroll);
-  }, [postId]);
+  }, [postSlug]);
 
   // Parse content and insert product cards at specified positions
   const renderContent = () => {
@@ -83,7 +83,7 @@ export function BlogPostContent({ content, productLinks, postId }: BlogPostConte
       productsAtPosition.forEach((product, pIndex) => {
         elements.push(
           <div key={`product-${index}-${pIndex}`} className="my-8">
-            <ProductCard product={product} postId={postId} />
+            <ProductCard product={product} postSlug={postSlug} />
           </div>
         );
       });

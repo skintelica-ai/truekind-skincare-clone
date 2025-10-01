@@ -10,14 +10,14 @@ interface ProductCardProps {
     productPrice: number;
     productUrl: string;
   };
-  postId: number;
+  postSlug: string;
 }
 
-export function ProductCard({ product, postId }: ProductCardProps) {
+export function ProductCard({ product, postSlug }: ProductCardProps) {
   const handleClick = async () => {
     // Track product click
     try {
-      await fetch(`/api/blog/posts/${postId}/analytics`, {
+      await fetch(`/api/blog/posts/${postSlug}/analytics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

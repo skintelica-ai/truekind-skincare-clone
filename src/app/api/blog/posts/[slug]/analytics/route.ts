@@ -13,17 +13,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     const { slug } = params;
     if (!slug) {
       return NextResponse.json({ 
-        error: "Valid post ID is required",
-        code: "INVALID_POST_ID" 
-      }, { status: 400 });
-    }
-
-    // Parse as ID (numeric)
-    const postId = parseInt(slug);
-    if (isNaN(postId)) {
-      return NextResponse.json({ 
-        error: "Valid numeric post ID is required",
-        code: "INVALID_POST_ID" 
+        error: "Valid post slug is required",
+        code: "INVALID_POST_SLUG" 
       }, { status: 400 });
     }
 
@@ -54,10 +45,10 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
       }, { status: 400 });
     }
 
-    // Validate postId exists
+    // Validate postSlug exists and get post ID
     const post = await db.select()
       .from(blogPosts)
-      .where(eq(blogPosts.id, postId))
+      .where(eq(blogPosts.slug, slug))
       .limit(1);
 
     if (post.length === 0) {
@@ -66,6 +57,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
         code: "POST_NOT_FOUND" 
       }, { status: 404 });
     }
+
+    const postId = post[0].id;
 
     // Prepare analytics data
     const analyticsData = {
@@ -98,24 +91,15 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
 
     if (!slug) {
       return NextResponse.json({ 
-        error: "Valid post ID is required",
-        code: "INVALID_POST_ID" 
+        error: "Valid post slug is required",
+        code: "INVALID_POST_SLUG" 
       }, { status: 400 });
     }
 
-    // Parse as ID (numeric)
-    const postId = parseInt(slug);
-    if (isNaN(postId)) {
-      return NextResponse.json({ 
-        error: "Valid numeric post ID is required",
-        code: "INVALID_POST_ID" 
-      }, { status: 400 });
-    }
-
-    // Validate postId exists
+    // Validate postSlug exists and get post ID
     const post = await db.select()
       .from(blogPosts)
-      .where(eq(blogPosts.id, postId))
+      .where(eq(blogPosts.slug, slug))
       .limit(1);
 
     if (post.length === 0) {
@@ -124,6 +108,8 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
         code: "POST_NOT_FOUND" 
       }, { status: 404 });
     }
+
+    const postId = post[0].id;
 
     // Date range filtering
     const from = searchParams.get('from');
