@@ -87,6 +87,7 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   // Initialize Tiptap editor
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: {
