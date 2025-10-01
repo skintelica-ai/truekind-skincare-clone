@@ -179,6 +179,119 @@ export const orderItems = sqliteTable('order_items', {
   createdAt: text('created_at').notNull(),
 });
 
+// Add comprehensive blog system tables
+export const blogPosts = sqliteTable('blog_posts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  slug: text('slug').notNull().unique(),
+  excerpt: text('excerpt'),
+  content: text('content'),
+  featuredImage: text('featured_image'),
+  featuredImageAlt: text('featured_image_alt'),
+  authorId: text('author_id').references(() => user.id),
+  categoryId: integer('category_id').references(() => blogCategories.id),
+  status: text('status').notNull().default('draft'),
+  scheduledPublishAt: integer('scheduled_publish_at', { mode: 'timestamp' }),
+  publishedAt: integer('published_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  readTime: integer('read_time'),
+  viewCount: integer('view_count').default(0),
+  shareCount: integer('share_count').default(0),
+  metaTitle: text('meta_title'),
+  metaDescription: text('meta_description'),
+  canonicalUrl: text('canonical_url'),
+  robotsMeta: text('robots_meta').default('index,follow'),
+  ogTitle: text('og_title'),
+  ogDescription: text('og_description'),
+  ogImage: text('og_image'),
+  twitterTitle: text('twitter_title'),
+  twitterDescription: text('twitter_description'),
+  twitterImage: text('twitter_image'),
+  focusKeyword: text('focus_keyword'),
+  seoScore: integer('seo_score'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogCategories = sqliteTable('blog_categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(),
+  slug: text('slug').notNull().unique(),
+  description: text('description'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogTags = sqliteTable('blog_tags', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(),
+  slug: text('slug').notNull().unique(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogPostTags = sqliteTable('blog_post_tags', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  postId: integer('post_id').references(() => blogPosts.id),
+  tagId: integer('tag_id').references(() => blogTags.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogComments = sqliteTable('blog_comments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  postId: integer('post_id').references(() => blogPosts.id),
+  authorId: text('author_id').references(() => user.id),
+  authorName: text('author_name'),
+  authorEmail: text('author_email'),
+  content: text('content').notNull(),
+  status: text('status').notNull().default('pending'),
+  parentCommentId: integer('parent_comment_id').references(() => blogComments.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogRevisions = sqliteTable('blog_revisions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  postId: integer('post_id').references(() => blogPosts.id),
+  title: text('title'),
+  content: text('content'),
+  excerpt: text('excerpt'),
+  createdBy: text('created_by').references(() => user.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  changeNote: text('change_note'),
+});
+
+export const blogProductLinks = sqliteTable('blog_product_links', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  postId: integer('post_id').references(() => blogPosts.id),
+  productId: integer('product_id').references(() => products.id),
+  position: integer('position'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogAnalytics = sqliteTable('blog_analytics', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  postId: integer('post_id').references(() => blogPosts.id),
+  event: text('event').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  userId: text('user_id').references(() => user.id),
+  sessionId: text('session_id'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const blogRedirects = sqliteTable('blog_redirects', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  fromSlug: text('from_slug').notNull().unique(),
+  toSlug: text('to_slug').notNull(),
+  statusCode: integer('status_code').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const authorProfiles = sqliteTable('author_profiles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').references(() => user.id).unique(),
+  bio: text('bio'),
+  avatar: text('avatar'),
+  socialLinks: text('social_links', { mode: 'json' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
 
 // Auth tables for better-auth
 export const user = sqliteTable("user", {

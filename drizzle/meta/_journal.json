@@ -22,6 +22,13 @@
       "when": 1759293930956,
       "tag": "0002_cuddly_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1759295102582,
+      "tag": "0003_rich_barracuda",
+      "breakpoints": true
     }
   ]
 }

@@ -208,7 +208,7 @@ export default function NavigationBar() {
     }
   };
 
-  const categories = ["MAKEUP", "SKINCARE", "HAIR", "TOOLS & BRUSHES", "BATH & BODY", "FRAGRANCE", "CLEAN", "GIFTS", "SALE"];
+  const categories = ["MAKEUP", "SKINCARE", "HAIR", "TOOLS & BRUSHES", "BATH & BODY", "FRAGRANCE", "CLEAN", "JOURNAL", "GIFTS", "SALE"];
 
   return (
     <>
@@ -222,6 +222,9 @@ export default function NavigationBar() {
             </Link>
             <Link href="/shop" className="hover:text-white/80 transition-all duration-300 hover:scale-105">
               Shop All
+            </Link>
+            <Link href="/blog" className="hover:text-white/80 transition-all duration-300 hover:scale-105">
+              Journal
             </Link>
           </div>
           <div className="flex items-center gap-4">
