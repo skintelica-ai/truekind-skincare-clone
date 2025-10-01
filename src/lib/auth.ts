@@ -4,10 +4,34 @@ import { bearer } from "better-auth/plugins";
 import { NextRequest } from 'next/server';
 import { headers } from "next/headers"
 import { db } from "@/db";
+
+// Dynamically determine base URL and trusted origins
+const getBaseURL = () => {
+	if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+	if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+	return "http://localhost:3000";
+};
+
+const getTrustedOrigins = () => {
+	const origins = [
+		"http://localhost:3000",
+		"https://localhost:3000"
+	];
+	
+	// Add the exact preview URL from environment
+	if (process.env.BETTER_AUTH_URL) {
+		origins.push(process.env.BETTER_AUTH_URL);
+	}
+	if (process.env.VERCEL_URL) {
+		origins.push(`https://${process.env.VERCEL_URL}`);
+	}
+	
+	return origins;
+};
  
 export const auth = betterAuth({
-	baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-	trustedOrigins: ["http://localhost:3000"],
+	baseURL: getBaseURL(),
+	trustedOrigins: getTrustedOrigins(),
 	database: drizzleAdapter(db, {
 		provider: "sqlite",
 	}),
