@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Eye, Edit, Trash2, Clock, Calendar, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
 
 interface BlogPost {
   id: number;
@@ -23,6 +25,8 @@ interface BlogPost {
 }
 
 export default function AdminBlogPage() {
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,10 +38,28 @@ export default function AdminBlogPage() {
     scheduled: 0,
   });
 
+  // Check authentication and role
   useEffect(() => {
-    fetchPosts();
-    fetchStats();
-  }, [statusFilter]);
+    if (!isPending && !session?.user) {
+      router.push(`/login?redirect=${encodeURIComponent('/admin/blog')}`);
+      return;
+    }
+
+    if (!isPending && session?.user) {
+      const userRole = (session.user as any).role;
+      if (userRole !== 'admin' && userRole !== 'editor') {
+        router.push('/');
+        return;
+      }
+    }
+  }, [session, isPending, router]);
+
+  useEffect(() => {
+    if (!isPending && session?.user) {
+      fetchPosts();
+      fetchStats();
+    }
+  }, [statusFilter, isPending, session]);
 
   const fetchPosts = async () => {
     try {
@@ -47,7 +69,12 @@ export default function AdminBlogPage() {
       if (searchQuery) params.append('search', searchQuery);
       params.append('limit', '50');
 
-      const res = await fetch(`/api/blog/posts?${params}`);
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch(`/api/blog/posts?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setPosts(data.posts || []);
@@ -61,7 +88,12 @@ export default function AdminBlogPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/blog/posts?limit=1000');
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch('/api/blog/posts?limit=1000', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         const allPosts = data.posts || [];
@@ -81,8 +113,12 @@ export default function AdminBlogPage() {
     if (!confirm('Are you sure you want to delete this post?')) return;
 
     try {
+      const token = localStorage.getItem('bearer_token');
       const res = await fetch(`/api/blog/posts/${id}`, {
         method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (res.ok) {
@@ -102,6 +138,23 @@ export default function AdminBlogPage() {
     fetchPosts();
   };
 
+  // Show loading state while checking authentication
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not admin/editor
+  if (!session?.user) return null;
+  const userRole = (session.user as any).role;
+  if (userRole !== 'admin' && userRole !== 'editor') return null;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -111,6 +164,9 @@ export default function AdminBlogPage() {
             <div>
               <h1 className="font-display text-4xl mb-2 text-foreground">Blog Management</h1>
               <p className="text-muted-foreground">Create and manage your blog content</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Logged in as: {session.user.name} ({userRole})
+              </p>
             </div>
             <Link
               href="/admin/blog/posts/new"

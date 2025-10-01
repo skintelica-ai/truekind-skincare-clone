@@ -29,6 +29,13 @@
       "when": 1759295102582,
       "tag": "0003_rich_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1759297176777,
+      "tag": "0004_bright_pyro",
+      "breakpoints": true
     }
   ]
 }

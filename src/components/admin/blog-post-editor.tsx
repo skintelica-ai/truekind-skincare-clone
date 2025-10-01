@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useSession } from '@/lib/auth-client';
 import { 
   Save, 
   Eye, 
@@ -26,6 +27,7 @@ interface BlogPostEditorProps {
 }
 
 export function BlogPostEditor({ postId }: BlogPostEditorProps) {
+  const { data: session, isPending } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,14 +75,32 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   // Preview
   const [showPreview, setShowPreview] = useState(false);
 
+  // Check authentication and role
   useEffect(() => {
-    if (postId) {
-      loadPost();
+    if (!isPending && !session?.user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
     }
-    loadCategories();
-    loadTags();
-    loadProducts();
-  }, [postId]);
+
+    if (!isPending && session?.user) {
+      const userRole = (session.user as any).role;
+      if (userRole !== 'admin' && userRole !== 'editor') {
+        router.push('/');
+        return;
+      }
+    }
+  }, [session, isPending, router]);
+
+  useEffect(() => {
+    if (!isPending && session?.user) {
+      if (postId) {
+        loadPost();
+      }
+      loadCategories();
+      loadTags();
+      loadProducts();
+    }
+  }, [postId, isPending, session]);
 
   useEffect(() => {
     // Auto-generate slug from title
@@ -103,7 +123,12 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   const loadPost = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/blog/posts/${postId}`);
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch(`/api/blog/posts/${postId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         const post = data.post;
@@ -138,7 +163,12 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch('/api/blog/categories');
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch('/api/blog/categories', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setCategories(data.categories || []);
@@ -150,7 +180,12 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadTags = async () => {
     try {
-      const res = await fetch('/api/blog/tags');
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch('/api/blog/tags', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setTags(data.tags || []);
@@ -162,7 +197,12 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
   const loadProducts = async () => {
     try {
-      const res = await fetch('/api/products?limit=100');
+      const token = localStorage.getItem('bearer_token');
+      const res = await fetch('/api/products?limit=100', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         setProducts(data.products || []);
@@ -222,10 +262,14 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
     try {
       const url = postId ? `/api/blog/posts/${postId}` : '/api/blog/posts';
       const method = postId ? 'PUT' : 'POST';
+      const token = localStorage.getItem('bearer_token');
       
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(postData)
       });
 
@@ -284,6 +328,23 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
       ['clean']
     ]
   };
+
+  // Show loading state while checking authentication
+  if (isPending) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not admin/editor
+  if (!session?.user) return null;
+  const userRole = (session.user as any).role;
+  if (userRole !== 'admin' && userRole !== 'editor') return null;
 
   if (loading) {
     return (
