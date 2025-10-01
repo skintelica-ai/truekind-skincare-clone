@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
 import { toast } from 'sonner';
 import { 
   Save, 
@@ -17,17 +21,24 @@ import {
   Plus,
   X,
   Search,
-  Upload
+  Upload,
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Quote,
+  Undo,
+  Redo,
+  Heading1,
+  Heading2,
+  Code
 } from 'lucide-react';
-import 'react-quill/dist/quill.snow.css';
-
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 interface BlogPostEditorProps {
   postId?: number;
 }
 
-export function BlogPostEditor({ postId }: BlogPostEditorProps) {
+const BlogPostEditor = ({ postId }: BlogPostEditorProps) => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -77,6 +88,48 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
   
   // Preview
   const [showPreview, setShowPreview] = useState(false);
+
+  // Initialize Tiptap editor
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-primary underline',
+        },
+      }),
+      Image.configure({
+        HTMLAttributes: {
+          class: 'rounded-lg max-w-full h-auto',
+        },
+      }),
+      Placeholder.configure({
+        placeholder: 'Start writing your blog post...',
+      }),
+    ],
+    content: content,
+    onUpdate: ({ editor }) => {
+      setContent(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-lg max-w-none focus:outline-none min-h-[400px] px-4 py-3',
+      },
+    },
+  });
+
+  // Update editor content when loading post
+  useEffect(() => {
+    if (editor && content && !editor.isDestroyed) {
+      editor.commands.setContent(content);
+    }
+  }, [editor, content]);
 
   useEffect(() => {
     if (postId) {
@@ -356,19 +409,6 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
     setProductLinks(productLinks.filter(p => p.productId !== productId));
   };
 
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
-      ['blockquote', 'code-block'],
-      ['link', 'image'],
-      [{ 'align': [] }],
-      ['clean']
-    ]
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -520,14 +560,104 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
 
             {/* Content Tab */}
             {activeTab === 'content' && (
-              <div className="bg-card border border-border rounded-lg p-6">
-                <ReactQuill
-                  value={content}
-                  onChange={setContent}
-                  modules={quillModules}
-                  className="h-96 mb-12"
-                  theme="snow"
-                />
+              <div className="bg-card border border-border rounded-lg overflow-hidden">
+                {/* Editor Toolbar */}
+                <div className="border-b border-border p-2 flex flex-wrap gap-1 bg-secondary/20">
+                  <button
+                    onClick={() => editor?.chain().focus().toggleBold().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('bold') ? 'bg-secondary' : ''
+                    }`}
+                    title="Bold"
+                  >
+                    <Bold className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().toggleItalic().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('italic') ? 'bg-secondary' : ''
+                    }`}
+                    title="Italic"
+                  >
+                    <Italic className="w-4 h-4" />
+                  </button>
+                  <div className="w-px bg-border mx-1" />
+                  <button
+                    onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('heading', { level: 1 }) ? 'bg-secondary' : ''
+                    }`}
+                    title="Heading 1"
+                  >
+                    <Heading1 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('heading', { level: 2 }) ? 'bg-secondary' : ''
+                    }`}
+                    title="Heading 2"
+                  >
+                    <Heading2 className="w-4 h-4" />
+                  </button>
+                  <div className="w-px bg-border mx-1" />
+                  <button
+                    onClick={() => editor?.chain().focus().toggleBulletList().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('bulletList') ? 'bg-secondary' : ''
+                    }`}
+                    title="Bullet List"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('orderedList') ? 'bg-secondary' : ''
+                    }`}
+                    title="Numbered List"
+                  >
+                    <ListOrdered className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().toggleBlockquote().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('blockquote') ? 'bg-secondary' : ''
+                    }`}
+                    title="Quote"
+                  >
+                    <Quote className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
+                    className={`p-2 rounded hover:bg-secondary transition-colors ${
+                      editor?.isActive('codeBlock') ? 'bg-secondary' : ''
+                    }`}
+                    title="Code Block"
+                  >
+                    <Code className="w-4 h-4" />
+                  </button>
+                  <div className="w-px bg-border mx-1" />
+                  <button
+                    onClick={() => editor?.chain().focus().undo().run()}
+                    disabled={!editor?.can().undo()}
+                    className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Undo"
+                  >
+                    <Undo className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => editor?.chain().focus().redo().run()}
+                    disabled={!editor?.can().redo()}
+                    className="p-2 rounded hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Redo"
+                  >
+                    <Redo className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {/* Editor Content */}
+                <EditorContent editor={editor} className="min-h-[400px]" />
               </div>
             )}
 
@@ -876,4 +1006,6 @@ export function BlogPostEditor({ postId }: BlogPostEditorProps) {
       </div>
     </div>
   );
-}
+};
+
+export default BlogPostEditor;
