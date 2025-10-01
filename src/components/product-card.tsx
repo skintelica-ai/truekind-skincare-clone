@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useSession } from "@/lib/auth-client";
 
 interface ProductCardProps {
   id: number;
@@ -35,6 +36,7 @@ export const ProductCard = ({
   isNew,
   productLine,
 }: ProductCardProps) => {
+  const { data: session } = useSession();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
@@ -45,12 +47,14 @@ export const ProductCard = ({
     try {
       const sessionId = localStorage.getItem("session_id") || `session_${Date.now()}`;
       localStorage.setItem("session_id", sessionId);
+      const userId = session?.user?.id;
 
       const response = await fetch("/api/cart-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          userId, // Include userId from session
           productId: id,
           quantity: 1,
         }),
@@ -70,6 +74,7 @@ export const ProductCard = ({
     e.preventDefault();
     const sessionId = localStorage.getItem("session_id") || `session_${Date.now()}`;
     localStorage.setItem("session_id", sessionId);
+    const userId = session?.user?.id;
 
     try {
       if (isWishlisted) {
@@ -81,6 +86,7 @@ export const ProductCard = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
+            userId, // Include userId from session
             productId: id,
           }),
         });

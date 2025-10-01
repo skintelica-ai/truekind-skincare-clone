@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, Heart, ShoppingBag, Minus, Plus, Check } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 
 interface Product {
   id: number;
@@ -53,6 +54,7 @@ export default function ProductDetailPage({
 }) {
   const { slug } = use(params);
   const router = useRouter();
+  const { data: session, isPending } = useSession();
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -112,12 +114,14 @@ export default function ProductDetailPage({
     try {
       const sessionId = localStorage.getItem("session_id") || `session_${Date.now()}`;
       localStorage.setItem("session_id", sessionId);
+      const userId = session?.user?.id;
 
       const response = await fetch("/api/cart-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          userId, // Include userId from session
           productId: product?.id,
           quantity,
         }),
@@ -140,12 +144,14 @@ export default function ProductDetailPage({
     try {
       const sessionId = localStorage.getItem("session_id") || `session_${Date.now()}`;
       localStorage.setItem("session_id", sessionId);
+      const userId = session?.user?.id;
 
       const response = await fetch("/api/wishlist-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          userId, // Include userId from session
           productId: product?.id,
         }),
       });

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 
 interface CartItem {
   id: number;
@@ -24,6 +25,7 @@ interface CartItem {
 
 export default function CartPage() {
   const router = useRouter();
+  const { data: session, isPending } = useSession();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingItems, setUpdatingItems] = useState<Set<number>>(new Set());
@@ -31,23 +33,31 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
 
   useEffect(() => {
-    fetchCart();
+    if (!isPending) {
+      fetchCart();
+    }
     
     const handleCartUpdate = () => fetchCart();
     window.addEventListener("cart-updated", handleCartUpdate);
     return () => window.removeEventListener("cart-updated", handleCartUpdate);
-  }, []);
+  }, [isPending]);
 
   const fetchCart = async () => {
     try {
       setLoading(true);
       const sessionId = localStorage.getItem("session_id");
+      const userId = session?.user?.id;
+      
       if (!sessionId) {
         setCartItems([]);
         return;
       }
 
-      const response = await fetch(`/api/cart-items?sessionId=${sessionId}`);
+      const url = userId 
+        ? `/api/cart-items?sessionId=${sessionId}&userId=${userId}`
+        : `/api/cart-items?sessionId=${sessionId}`;
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       if (!data.items || data.items.length === 0) {

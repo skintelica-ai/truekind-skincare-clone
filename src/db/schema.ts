@@ -89,7 +89,7 @@ export const productTags = sqliteTable('product_tags', {
 export const reviews = sqliteTable('reviews', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   productId: integer('product_id').references(() => products.id),
-  userId: integer('user_id'),
+  userId: text('user_id').references(() => user.id),
   rating: integer('rating').notNull(),
   title: text('title'),
   comment: text('comment').notNull(),
@@ -112,7 +112,7 @@ export const productFaqs = sqliteTable('product_faqs', {
 export const cartItems = sqliteTable('cart_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   sessionId: text('session_id'),
-  userId: integer('user_id'),
+  userId: text('user_id').references(() => user.id),
   productId: integer('product_id').references(() => products.id),
   quantity: integer('quantity').default(1),
   createdAt: text('created_at').notNull(),
@@ -123,7 +123,7 @@ export const cartItems = sqliteTable('cart_items', {
 export const wishlistItems = sqliteTable('wishlist_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   sessionId: text('session_id'),
-  userId: integer('user_id'),
+  userId: text('user_id').references(() => user.id),
   productId: integer('product_id').references(() => products.id),
   createdAt: text('created_at').notNull(),
 });
@@ -149,7 +149,7 @@ export const coupons = sqliteTable('coupons', {
 export const orders = sqliteTable('orders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   orderNumber: text('order_number').notNull().unique(),
-  userId: integer('user_id'),
+  userId: text('user_id').references(() => user.id),
   sessionId: text('session_id'),
   status: text('status').notNull(),
   subtotal: real('subtotal').notNull(),
@@ -177,4 +177,70 @@ export const orderItems = sqliteTable('order_items', {
   unitPrice: real('unit_price').notNull(),
   totalPrice: real('total_price').notNull(),
   createdAt: text('created_at').notNull(),
+});
+
+
+// Auth tables for better-auth
+export const user = sqliteTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: integer("email_verified", { mode: "boolean" })
+    .$defaultFn(() => false)
+    .notNull(),
+  image: text("image"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
+export const session = sqliteTable("session", {
+  id: text("id").primaryKey(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const account = sqliteTable("account", {
+  id: text("id").primaryKey(),
+  accountId: text("account_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: integer("access_token_expires_at", {
+    mode: "timestamp",
+  }),
+  refreshTokenExpiresAt: integer("refresh_token_expires_at", {
+    mode: "timestamp",
+  }),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const verification = sqliteTable("verification", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(
+    () => new Date(),
+  ),
 });

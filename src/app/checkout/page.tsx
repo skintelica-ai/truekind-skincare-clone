@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { useSession } from "@/lib/auth-client";
+
+// Extend Window interface for Razorpay
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 interface CartItem {
   id: number;
@@ -22,6 +31,7 @@ interface CartItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const { data: session, isPending } = useSession();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -38,19 +48,35 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    fetchCart();
-  }, []);
+    if (!isPending) {
+      fetchCart();
+      loadRazorpayScript();
+    }
+  }, [isPending]);
+
+  const loadRazorpayScript = () => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+  };
 
   const fetchCart = async () => {
     try {
       setLoading(true);
       const sessionId = localStorage.getItem("session_id");
+      const userId = session?.user?.id;
+      
       if (!sessionId) {
         router.push("/cart");
         return;
       }
 
-      const response = await fetch(`/api/cart-items?sessionId=${sessionId}`);
+      const url = userId 
+        ? `/api/cart-items?sessionId=${sessionId}&userId=${userId}`
+        : `/api/cart-items?sessionId=${sessionId}`;
+      
+      const response = await fetch(url);
       const data = await response.json();
 
       if (!data.items || data.items.length === 0) {
@@ -86,12 +112,123 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleRazorpayPayment = async (orderData: any) => {
+    try {
+      const subtotal = cartItems.reduce(
+        (sum, item) => sum + item.product.price * item.quantity,
+        0
+      );
+
+      // Create Razorpay order
+      const createOrderRes = await fetch("/api/razorpay/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: subtotal,
+          currency: "INR",
+          receipt: `order_${Date.now()}`,
+          notes: {
+            customer_name: formData.fullName,
+            customer_email: formData.email,
+          },
+        }),
+      });
+
+      const orderResponse = await createOrderRes.json();
+
+      if (!orderResponse.success) {
+        toast.error("Failed to create payment order");
+        return false;
+      }
+
+      // Initialize Razorpay
+      const options = {
+        key: orderResponse.key_id,
+        amount: orderResponse.order.amount,
+        currency: orderResponse.order.currency,
+        name: "TrueKind Skincare",
+        description: "Order Payment",
+        order_id: orderResponse.order.id,
+        prefill: {
+          name: formData.fullName,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        theme: {
+          color: "#2d2d2d",
+        },
+        handler: async function (response: any) {
+          // Verify payment
+          const verifyRes = await fetch("/api/razorpay/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+
+          if (verifyData.verified) {
+            // Create order in database
+            const createDbOrderRes = await fetch("/api/orders", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...orderData,
+                paymentStatus: "completed",
+                status: "confirmed",
+              }),
+            });
+
+            if (createDbOrderRes.ok) {
+              const data = await createDbOrderRes.json();
+              
+              // Clear cart
+              await Promise.all(
+                cartItems.map((item) =>
+                  fetch(`/api/cart-items/${item.id}`, { method: "DELETE" })
+                )
+              );
+
+              localStorage.removeItem("session_id");
+              window.dispatchEvent(new CustomEvent("cart-updated"));
+              
+              toast.success("Payment successful!");
+              router.push(`/orders?success=true&orderId=${data.order.id}`);
+            }
+          } else {
+            toast.error("Payment verification failed");
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            toast.error("Payment cancelled");
+            setSubmitting(false);
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      
+      return true;
+    } catch (error) {
+      console.error("Razorpay payment error:", error);
+      toast.error("Payment failed. Please try again.");
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
       const sessionId = localStorage.getItem("session_id");
+      const userId = session?.user?.id;
       const subtotal = cartItems.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
         0
@@ -101,6 +238,7 @@ export default function CheckoutPage() {
 
       const orderData = {
         sessionId,
+        userId, // Include userId from session
         status: "pending",
         subtotal,
         discountAmount: 0,
@@ -114,31 +252,43 @@ export default function CheckoutPage() {
         notes: formData.notes,
       };
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData),
-      });
+      if (formData.paymentMethod === "card") {
+        // Handle Razorpay payment
+        await handleRazorpayPayment(orderData);
+      } else {
+        // Handle COD
+        const response = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(orderData),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Clear cart
-        await Promise.all(
-          cartItems.map((item) =>
-            fetch(`/api/cart-items/${item.id}`, { method: "DELETE" })
-          )
-        );
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Clear cart
+          await Promise.all(
+            cartItems.map((item) =>
+              fetch(`/api/cart-items/${item.id}`, { method: "DELETE" })
+            )
+          );
 
-        localStorage.removeItem("session_id");
-        window.dispatchEvent(new CustomEvent("cart-updated"));
-        router.push(`/orders?success=true&orderId=${data.order.id}`);
+          localStorage.removeItem("session_id");
+          window.dispatchEvent(new CustomEvent("cart-updated"));
+          
+          toast.success("Order placed successfully!");
+          router.push(`/orders?success=true&orderId=${data.order.id}`);
+        } else {
+          toast.error("Failed to create order. Please try again.");
+        }
       }
     } catch (error) {
       console.error("Error creating order:", error);
-      alert("Failed to create order. Please try again.");
+      toast.error("Failed to create order. Please try again.");
     } finally {
-      setSubmitting(false);
+      if (formData.paymentMethod === "cod") {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -298,7 +448,12 @@ export default function CheckoutPage() {
                       }
                       className="h-4 w-4"
                     />
-                    <span className="font-medium">Credit/Debit Card</span>
+                    <div className="flex-1">
+                      <span className="font-medium">Pay with Razorpay</span>
+                      <p className="text-xs text-medium-gray mt-1">
+                        Credit/Debit Card, UPI, Net Banking, Wallets
+                      </p>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -373,7 +528,11 @@ export default function CheckoutPage() {
                 className="w-full rounded-full"
                 size="lg"
               >
-                {submitting ? "Placing Order..." : "Place Order"}
+                {submitting 
+                  ? "Processing..." 
+                  : formData.paymentMethod === "card" 
+                    ? "Proceed to Payment" 
+                    : "Place Order"}
               </Button>
             </div>
           </div>

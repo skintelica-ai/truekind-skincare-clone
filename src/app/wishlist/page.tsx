@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/lib/auth-client";
 
 interface WishlistItem {
   id: number;
@@ -31,30 +32,39 @@ interface ProductImage {
 }
 
 export default function WishlistPage() {
+  const { data: session, isPending } = useSession();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWishlist();
+    if (!isPending) {
+      fetchWishlist();
+    }
 
     const handleWishlistUpdate = () => fetchWishlist();
     window.addEventListener("wishlist-updated", handleWishlistUpdate);
     return () => window.removeEventListener("wishlist-updated", handleWishlistUpdate);
-  }, []);
+  }, [isPending]);
 
   const fetchWishlist = async () => {
     try {
       setLoading(true);
       const sessionId = localStorage.getItem("session_id");
+      const userId = session?.user?.id;
+      
       if (!sessionId) {
         setWishlistItems([]);
         return;
       }
 
+      const url = userId 
+        ? `/api/wishlist-items?sessionId=${sessionId}&userId=${userId}`
+        : `/api/wishlist-items?sessionId=${sessionId}`;
+
       const [wishlistRes, productsRes, imagesRes] = await Promise.all([
-        fetch(`/api/wishlist-items?sessionId=${sessionId}`),
+        fetch(url),
         fetch("/api/products"),
         fetch("/api/product-images"),
       ]);
